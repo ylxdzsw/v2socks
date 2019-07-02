@@ -1,0 +1,13 @@
+[package]
+name = "v2socks"
+version = "0.1.0"
+authors = ["ylxdzsw <ylxdzsw@gmail.com>"]
+edition = "2018"
+
+[profile.release]
+panic = "abort"
+lto = true
+
+[dependencies]
+oh-my-rust = { git = "https://github.com/ylxdzsw/oh-my-rust" }
+rust-crypto = "0.2"
