@@ -2,12 +2,42 @@
 #![deny(bare_trait_objects)]
 
 use v2socks;
-use crypto::digest::Digest;
-use crypto::sha3::Sha3;
+use oh_my_rust::*;
+use std::net::TcpListener;
+use std::io::{prelude::*, BufRead, BufReader};
 
 fn main() {
-    let mut hasher = Sha3::shake_128();
-    hasher.input(b" fuck them");
-    let hex = hasher.result_str();
-    println!("Hello, world! and {}", hex);
+    let socket = TcpListener::bind("0.0.0.0:1080").expect("Address already in use");
+    info!("v2socks starts listening at 0.0.0.0:1080");
+
+    for stream in socket.incoming() {
+        let stream = stream.unwrap();
+        std::thread::spawn(move || {
+            if let Err(e) = initialize(&mut &stream) {
+                error!("{}", e);
+                return // close connection
+            }
+
+            std::io::copy(&mut &stream, &mut std::io::stdout()).unwrap();
+        });
+    }
+}
+
+fn initialize(stream: &mut (impl ReadExt + Write)) -> Result<(), String> {
+    let mut header = [0, 0];
+    stream.read_exact(&mut header).map_err(|_| "read initial bits failed")?;
+    
+    if header[0] != 5 {
+        return Err(format!("unsupported socks version {}", header[0]))
+    }
+
+    let list: Vec<u8> = stream.read_exact_alloc(header[1] as usize).map_err(|_| "read methods failed")?;
+
+    if !list.contains(&0) {
+        stream.write(&[5, 0xff]).map_err(|_| "write response failed")?;
+        return Err("client do not support NO AUTH method".to_owned())
+    }
+
+    stream.write(&[5, 0]).map_err(|_| "write response failed")?;
+    Ok(())
 }
