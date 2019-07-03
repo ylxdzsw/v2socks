@@ -7,7 +7,18 @@ macro_rules! read_exact {
     ($stream: expr, $array: expr) => {{
         let mut x = $array;
         $stream.read_exact(&mut x).map(|_| x)
-    }};
+    }}
+}
+
+macro_rules! close_on_error {
+    ($ex: expr) => {{
+        match $ex {
+            Ok(x) => x,
+            Err(e) => {
+                return error!("{}", e)
+            }
+        }
+    }}
 }
 
 pub struct Socks5Server;
@@ -17,32 +28,18 @@ impl Socks5Server {
         return Socks5Server
     }
 
-    pub fn listen<T>(&self, connect: &'static (impl FnOnce(Addr, u16) -> (Addr, u16, T) + Sync), pass: &'static (impl FnMut(T, &mut &TcpStream) + Sync)) {
+    pub fn listen<T>(&self, connect: &'static (impl Fn(Addr, u16) -> (Addr, u16, T) + Sync), pass: &'static (impl Fn(T, TcpStream) + Sync)) {
         let socket = TcpListener::bind("0.0.0.0:1080").expect("Address already in use");
         info!("v2socks starts listening at 0.0.0.0:1080");
 
         for stream in socket.incoming() {
             let stream = stream.unwrap();
             std::thread::spawn(move || {
-                if let Err(e) = initialize(&mut &stream) {
-                    error!("{}", e);
-                    return // close connection
-                }
-
-                let (addr, port) = match read_request(&mut &stream) {
-                    Ok(req) => req,
-                    Err(e) => {
-                        error!("{}", e);
-                        // TODO: properly respond with correct error number
-                        return // close connection
-                    }
-                };
-
+                close_on_error!(initialize(&mut &stream));
+                let (addr, port) = close_on_error!(read_request(&mut &stream)); // TODO: properly respond with correct error number
                 let (local_addr, local_port, proxy) = connect(addr, port);
-
-                reply_request(&mut &stream, local_addr, local_port);
-
-                pass(proxy, &mut &stream);
+                close_on_error!(reply_request(&mut &stream, local_addr, local_port));
+                pass(proxy, stream);
             });
         }
     }
