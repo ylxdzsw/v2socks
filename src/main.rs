@@ -5,6 +5,10 @@ use v2socks::*;
 // 2. spawn a child thread for each connection, perform the sock5 and vmess handshake respectively
 // 3. after the handshake succeed, add both stream to the global pipe poll
 
+// roadmap:
+// 1. remove token table in piper and use direct pointers instead.
+// 2. split read and write and fully asynconize IO
+
 fn main() {
     let server = Socks5Server::new();
     server.listen(&|dest, port| {
