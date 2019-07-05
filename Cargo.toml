@@ -12,3 +12,4 @@ lto = true
 oh-my-rust = { git = "https://github.com/ylxdzsw/oh-my-rust" }
 rust-crypto = "0.2"
 uuid = { version = "0.7", features = ["v4"] }
+rand = "0.7"

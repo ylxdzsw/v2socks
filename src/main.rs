@@ -19,19 +19,23 @@ fn main() {
 
         (local_addr, local_port, client)
     }, &|proxy, stream| {
-        {
-            let mut proxy = proxy.try_clone().unwrap();
-            let mut stream = stream.try_clone().unwrap();
-            std::thread::spawn(move || {
-                std::io::copy(&mut proxy, &mut stream)
-            });
-        }
-        {
-            let mut proxy = proxy.try_clone().unwrap();
-            let mut stream = stream.try_clone().unwrap();
-            std::thread::spawn(move || {
-                std::io::copy(&mut stream, &mut proxy)
-            });
-        }
+        
     })
 }
+
+// let plain = |proxy, stream| {
+//     {
+//         let mut proxy = proxy.try_clone().unwrap();
+//         let mut stream = stream.try_clone().unwrap();
+//         std::thread::spawn(move || {
+//             std::io::copy(&mut proxy, &mut stream)
+//         });
+//     }
+//     {
+//         let mut proxy = proxy.try_clone().unwrap();
+//         let mut stream = stream.try_clone().unwrap();
+//         std::thread::spawn(move || {
+//             std::io::copy(&mut stream, &mut proxy)
+//         });
+//     }
+// }

@@ -28,7 +28,7 @@ impl Socks5Server {
         return Socks5Server
     }
 
-    pub fn listen<T>(&self, connect: &'static (impl Fn(Addr, u16) -> (Addr, u16, T) + Sync), pass: &'static (impl Fn(T, TcpStream) + Sync)) {
+    pub fn listen<T>(&self, connect: &'static (impl Fn(&Addr, u16) -> (Addr, u16, T) + Sync), pass: &'static (impl Fn(T, TcpStream) + Sync)) {
         let socket = TcpListener::bind("0.0.0.0:1080").expect("Address already in use");
         info!("v2socks starts listening at 0.0.0.0:1080");
 
@@ -37,8 +37,9 @@ impl Socks5Server {
             std::thread::spawn(move || {
                 close_on_error!(initialize(&mut &stream));
                 let (addr, port) = close_on_error!(read_request(&mut &stream)); // TODO: properly respond with correct error number
-                let (local_addr, local_port, proxy) = connect(addr, port);
+                let (local_addr, local_port, proxy) = connect(&addr, port);
                 close_on_error!(reply_request(&mut &stream, local_addr, local_port));
+                debug!("established connection to {}:{}", addr, port);
                 pass(proxy, stream);
             });
         }
