@@ -16,8 +16,8 @@ impl VmessClient {
 
 }
 
-#[allow(non_snake_case)]
-fn request(user_id: [u8; 16], addr: Addr, port: u16) {
+#[allow(non_snake_case, non_upper_case_globals)]
+pub fn request(user_id: [u8; 16], addr: Addr, port: u16) -> Box<[u8]> {
     let mut buffer = Vec::new();
 
     let time = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs().to_be_bytes();
@@ -49,11 +49,9 @@ fn request(user_id: [u8; 16], addr: Addr, port: u16) {
     let opt = 0b0000_0001;
     buffer.push(opt);
 
-    let P = [0; 4]; // yet another uneccesary random value
-    buffer.extend_from_slice(&P);
-
+    const P_len: u8 = 1;
     let sec = 0; // AES-128-CFB
-    buffer.push(sec);
+    buffer.push((P_len << 4) | (sec & 0x0f));
 
     let rev = 0; // reserved
     buffer.push(rev);
@@ -61,7 +59,32 @@ fn request(user_id: [u8; 16], addr: Addr, port: u16) {
     let cmd = 1; // tcp
     buffer.push(cmd);
 
+    let port = port.to_be_bytes();
+    buffer.extend_from_slice(&port);
 
+    match addr {
+        Addr::V4(x) => {
+            buffer.push(1);
+            buffer.extend_from_slice(&x);
+        }
+        Addr::V6(x) => {
+            buffer.push(3);
+            buffer.extend_from_slice(&x);
+        },
+        Addr::Domain(x) => {
+            buffer.push(2);
+            buffer.push(x.len() as u8);
+            buffer.extend_from_slice(&x);
+        }
+    }
+
+    let P = [0; P_len as usize];
+    buffer.extend_from_slice(&P);
+
+    let F = fnv1a(&buffer);
+    buffer.extend_from_slice(&F.to_be_bytes());
+
+    buffer.into_boxed_slice()
 }
 
 fn shake() {
@@ -77,4 +100,14 @@ fn md5(x: &[u8]) -> [u8; 16] {
     digest.input(x);
     digest.result(&mut result);
     result
+}
+
+fn fnv1a(x: &[u8]) -> u32 {
+    let prime = 16777619;
+    let mut hash = 0x811c9dc5;
+    for byte in x.iter() {
+        hash ^= *byte as u32;
+        hash *= prime;
+    }
+    hash
 }

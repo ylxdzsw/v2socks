@@ -6,21 +6,23 @@ use v2socks::*;
 // 3. after the handshake succeed, spawn a pair of threads to pipe the two connections forward and backward
 
 fn main() {
-    let server = Socks5Server::new();
+    // let server = Socks5Server::new();
 
-    server.listen(&|dest, port| {
-        let client = std::net::TcpStream::connect(format!("{}:{}", dest, port)).unwrap();
-        let local = client.local_addr().unwrap();
-        let local_addr = match local.ip() {
-            std::net::IpAddr::V4(x) => Addr::V4(x.octets()),
-            std::net::IpAddr::V6(x) => Addr::V6(x.octets()),
-        };
-        let local_port = local.port();
+    // server.listen(&|dest, port| {
+    //     let client = std::net::TcpStream::connect(format!("{}:{}", dest, port)).unwrap();
+    //     let local = client.local_addr().unwrap();
+    //     let local_addr = match local.ip() {
+    //         std::net::IpAddr::V4(x) => Addr::V4(x.octets()),
+    //         std::net::IpAddr::V6(x) => Addr::V6(x.octets()),
+    //     };
+    //     let local_port = local.port();
 
-        (local_addr, local_port, client)
-    }, &|proxy, stream| {
+    //     (local_addr, local_port, client)
+    // }, &|proxy, stream| {
         
-    })
+    // })
+
+    v2socks::vmess::request();
 }
 
 // let plain = |proxy, stream| {
