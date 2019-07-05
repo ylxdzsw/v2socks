@@ -1,4 +1,6 @@
 use v2socks::*;
+use oh_my_rust::*;
+use std::io::prelude::*;
 
 // basic logic:
 // 1. main thread listen for socks5 connections
@@ -11,6 +13,14 @@ use v2socks::*;
 
 fn main() {
     let server = Socks5Server::new();
+
+    let pass = Box::leak(Box::new(move |proxy, stream: std::net::TcpStream| {
+        let mut proxy = std::sync::Arc::new(proxy);
+        let mut stream = std::sync::Arc::new(stream);
+
+        unimplemented!()
+    }));
+
     server.listen(&|dest, port| {
         let client = std::net::TcpStream::connect(format!("{}:{}", dest, port)).unwrap();
         let local = client.local_addr().unwrap();
@@ -19,19 +29,7 @@ fn main() {
             std::net::IpAddr::V6(x) => Addr::V6(x.octets()),
         };
         let local_port = local.port();
-        
+
         (local_addr, local_port, client)
-    }, &|proxy, stream| {
-        let proxy = std::sync::Arc::new(proxy);
-        let stream = std::sync::Arc::new(proxy);
-
-        std::thread::spawn(move || {
-            let p = &proxy.clone();
-
-        });
-
-        std::thread::spawn(move || {
-
-        });
-    })
+    }, pass)
 }

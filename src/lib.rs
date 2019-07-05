@@ -4,7 +4,6 @@
 
 mod socks;
 mod vmess;
-mod piper;
 
 pub use socks::Socks5Server;
 pub use vmess::VmessClient;
