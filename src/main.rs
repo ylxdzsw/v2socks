@@ -1,4 +1,5 @@
 use v2socks::*;
+use std::io::prelude::*;
 
 // basic logic:
 // 1. main thread listen for socks5 connections
@@ -22,7 +23,29 @@ fn main() {
         
     // })
 
-    v2socks::vmess::request();
+    let (auth, cmd) = v2socks::vmess::request(
+        [219, 131, 173, 224, 50, 114, 78, 197, 160, 203, 164, 175, 6, 31, 23, 48],
+        Addr::Domain("www.google.com".as_bytes().to_owned().into_boxed_slice()),
+        443
+    );
+
+    let mut sock = std::net::TcpStream::connect("setsuna.v2.cccat.io:8080").unwrap();
+    println!("about to write");
+    sock.write(&auth).unwrap();
+    // sock.write(&cmd).unwrap();
+
+    loop {
+        let mut x = [0; 1024];
+        println!("about to read");
+        let n = sock.read(&mut x).unwrap();
+        println!("after read");
+        if n == 0 {
+            break
+        }
+        println!("{:?}", Vec::new().extend_from_slice(&x));
+    }
+
+    println!("finished")
 }
 
 // let plain = |proxy, stream| {

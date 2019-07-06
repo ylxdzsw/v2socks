@@ -3,7 +3,7 @@
 #![allow(non_camel_case_types)]
 
 mod socks;
-mod vmess;
+pub mod vmess;
 
 pub use socks::Socks5Server;
 pub use vmess::VmessClient;
