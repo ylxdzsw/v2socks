@@ -5,10 +5,10 @@
 mod socks;
 mod vmess;
 
-pub use socks::Socks5Server;
-pub use vmess::VmessClient;
+pub use socks::*;
+pub use vmess::*;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Addr {
     V4([u8; 4]),
     V6([u8; 16]),
