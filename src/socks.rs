@@ -21,11 +21,13 @@ macro_rules! close_on_error {
     }}
 }
 
-pub struct Socks5Server;
+pub struct Socks5Server {
+    port: u16
+}
 
 impl Socks5Server {
-    pub fn new() -> Socks5Server {
-        return Socks5Server
+    pub fn new(port: u16) -> Socks5Server {
+        Socks5Server { port }
     }
 
     pub fn listen<T>(&self, connect: &'static (impl Fn(Addr, u16) -> (Addr, u16, T) + Sync), pass: &'static (impl Fn(T, TcpStream) + Sync)) {

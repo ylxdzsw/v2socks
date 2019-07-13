@@ -126,6 +126,7 @@ impl VmessWriter<std::net::TcpStream> {
 }
 
 impl<W: Write> VmessWriter<W> {
+    #[allow(non_snake_case, non_upper_case_globals)]
     fn handshake(&mut self, user_id: [u8; 16], addr: Addr, port: u16, key: [u8; 16], IV: [u8; 16]) -> std::io::Result<()> {
         let time = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs().to_be_bytes();
         let mut hmac = crypto::hmac::Hmac::new(crypto::md5::Md5::new(), &user_id);
