@@ -27,7 +27,7 @@ impl VmessReader<std::io::BufReader<std::net::TcpStream>> {
     #[allow(non_snake_case)]
     pub fn new(conn: std::net::TcpStream, key: [u8; 16], IV: [u8; 16]) -> Self {
         let mut reader = VmessReader {
-            reader: std::io::BufReader::new(conn),
+            reader: std::io::BufReader::with_capacity(1<<14, conn),
             decoder: AES128CFB::new(md5!(&key), md5!(&IV))
         };
         reader.handshake();

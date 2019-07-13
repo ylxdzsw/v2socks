@@ -14,7 +14,6 @@ use std::io::prelude::*;
 
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
-    println!("{:?}", args);
     let args: Vec<_> = args.iter().map(|x| &x[..]).collect();
     match args[..] {
         ["plain"] | ["plain", _] => {
@@ -47,13 +46,14 @@ fn parse_uid(x: &str) -> Option<[u8; 16]> {
 fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
     let connect = Box::leak(Box::new(move |dest, port| {
         let client = std::net::TcpStream::connect(&proxy).unwrap();
+        debug!("connect {}:{} through proxy", &dest, port);
+
         let local = client.local_addr().unwrap();
         let local_addr = match local.ip() {
             std::net::IpAddr::V4(x) => Addr::V4(x.octets()),
             std::net::IpAddr::V6(x) => Addr::V6(x.octets()),
         };
         let local_port = local.port();
-        debug!("connect {}:{} through proxy", &dest, port);
 
         (local_addr, local_port, (dest, port, client))
     }));
@@ -72,9 +72,9 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
             
             std::thread::spawn(move || {
                 let mut reader = VmessReader::new(conn, key, IV);
-                let mut buffer = [0; 1<<14];
+                let mut buffer = Box::new([0; 1<<14]);
                 loop {
-                    let len = reader.read(&mut buffer).unwrap();
+                    let len = reader.read(&mut *buffer).unwrap();
                     if len == 0 {
                         reader.into_inner().shutdown(std::net::Shutdown::Read).ignore();
                         debug!("closed reading");
@@ -91,9 +91,9 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
             let mut stream = stream.try_clone().unwrap();
             std::thread::spawn(move || {
                 let mut writer = VmessWriter::new(conn, user_id, dest, port, key, IV);
-                let mut buffer = [0; 1<<14];
+                let mut buffer = Box::new([0; 1<<14]);
                 loop {
-                    let len = stream.read(&mut buffer).unwrap();
+                    let len = stream.read(&mut *buffer).unwrap();
                     if len == 0 {
                         writer.write(&[]).unwrap(); // as required by the spec
                         writer.into_inner().shutdown(std::net::Shutdown::Write).ignore();
@@ -101,7 +101,7 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
                         return
                     }
                     writer.write_all(&buffer[..len]).unwrap();
-                    debug!("send {} bytes", len);
+                    debug!("sent {} bytes", len);
                 }
             });
         }

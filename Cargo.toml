@@ -1,6 +1,6 @@
 [package]
 name = "v2socks"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["ylxdzsw <ylxdzsw@gmail.com>"]
 edition = "2018"
 
