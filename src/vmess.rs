@@ -39,23 +39,6 @@ impl VmessReader<std::io::BufReader<std::net::TcpStream>> {
     }
 }
 
-impl VmessReader<std::net::TcpStream> {
-    /// key and IV are just data key and iv in the request header, this function will calculate the md5 it selfs
-    #[allow(non_snake_case)]
-    pub fn new(conn: std::net::TcpStream, key: [u8; 16], IV: [u8; 16]) -> Self {
-        let mut reader = VmessReader {
-            reader: conn,
-            decoder: AES128CFB::new(md5!(&key), md5!(&IV))
-        };
-        reader.handshake();
-        reader
-    }
-
-    pub fn into_inner(self) -> std::net::TcpStream {
-        self.reader
-    }
-}
-
 impl<R: ReadExt> VmessReader<R> {
     fn handshake(&mut self) {
         let mut head = [0; 4];
@@ -211,7 +194,7 @@ impl<W: Write> Write for VmessWriter<W> {
     }
 }
 
-fn fnv1a(x: &[u8]) -> u32 { // checked
+fn fnv1a(x: &[u8]) -> u32 {
     let prime = 16777619;
     let mut hash = 0x811c9dc5;
     for byte in x.iter() {

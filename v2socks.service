@@ -1,0 +1,6 @@
+[Unit]
+Description=v2socks
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/v2socks plain

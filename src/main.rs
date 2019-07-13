@@ -71,7 +71,7 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
             let mut stream = stream.try_clone().unwrap();
             
             std::thread::spawn(move || {
-                let mut reader = VmessReader::<std::net::TcpStream>::new(conn, key, IV);
+                let mut reader = VmessReader::new(conn, key, IV);
                 let mut buffer = [0; 1<<14];
                 loop {
                     let len = reader.read(&mut buffer).unwrap();
