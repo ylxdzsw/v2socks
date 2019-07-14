@@ -59,7 +59,7 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
     }));
 
     #[allow(non_snake_case)]
-    let pass = Box::leak(Box::new(move |(dest, port, conn): (Addr, u16, std::net::TcpStream), stream: std::net::TcpStream| {
+    let pass = Box::leak(Box::new(move |(dest, port, conn): (Addr, u16, std::net::TcpStream), mut stream: std::net::TcpStream| {
         let mut key = [0; 16];
         thread_rng().fill_bytes(&mut key);
 
@@ -69,10 +69,10 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
         {
             let conn = conn.try_clone().unwrap();
             let mut stream = stream.try_clone().unwrap();
-            
+
             std::thread::spawn(move || {
                 let mut reader = VmessReader::new(conn, key, IV);
-                let mut buffer = Box::new([0; 1<<14]);
+                let mut buffer = Box::new( unsafe { std::mem::uninitialized::<[u8; 16384]>() } );
                 loop {
                     let len = reader.read(&mut *buffer).unwrap();
                     if len == 0 {
@@ -86,24 +86,18 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
             });
         }
 
-        {
-            let conn = conn.try_clone().unwrap();
-            let mut stream = stream.try_clone().unwrap();
-            std::thread::spawn(move || {
-                let mut writer = VmessWriter::new(conn, user_id, dest, port, key, IV);
-                let mut buffer = Box::new([0; 1<<14]);
-                loop {
-                    let len = stream.read(&mut *buffer).unwrap();
-                    if len == 0 {
-                        writer.write(&[]).unwrap(); // as required by the spec
-                        writer.into_inner().shutdown(std::net::Shutdown::Write).ignore();
-                        debug!("closed writing");
-                        return
-                    }
-                    writer.write_all(&buffer[..len]).unwrap();
-                    debug!("sent {} bytes", len);
-                }
-            });
+        let mut writer = VmessWriter::new(conn, user_id, dest, port, key, IV);
+        let mut buffer = Box::new( unsafe { std::mem::uninitialized::<[u8; 16384]>() } );
+        loop {
+            let len = stream.read(&mut *buffer).unwrap();
+            if len == 0 {
+                writer.write(&[]).unwrap(); // as required by the spec
+                writer.into_inner().shutdown(std::net::Shutdown::Write).ignore();
+                debug!("closed writing");
+                return
+            }
+            writer.write_all(&buffer[..len]).unwrap();
+            debug!("sent {} bytes", len);
         }
     }));
 
@@ -123,7 +117,7 @@ fn plain(server: &Socks5Server) {
         let local_port = local.port();
 
         (local_addr, local_port, client)
-    }, &|proxy, stream| {
+    }, &|mut proxy, mut stream| {
         {
             let mut proxy = proxy.try_clone().unwrap();
             let mut stream = stream.try_clone().unwrap();
@@ -131,12 +125,6 @@ fn plain(server: &Socks5Server) {
                 std::io::copy(&mut proxy, &mut stream)
             });
         }
-        {
-            let mut proxy = proxy.try_clone().unwrap();
-            let mut stream = stream.try_clone().unwrap();
-            std::thread::spawn(move || {
-                std::io::copy(&mut stream, &mut proxy)
-            });
-        }
+        std::io::copy(&mut stream, &mut proxy).unwrap();
     })
 }
