@@ -25,13 +25,13 @@ pub struct VmessReader<R: ReadExt> {
 impl VmessReader<std::io::BufReader<std::net::TcpStream>> {
     /// key and IV are just data key and iv in the request header, this function will calculate the md5 it selfs
     #[allow(non_snake_case)]
-    pub fn new(conn: std::net::TcpStream, key: [u8; 16], IV: [u8; 16]) -> Self {
+    pub fn new(conn: std::net::TcpStream, key: [u8; 16], IV: [u8; 16]) -> Option<Self> {
         let mut reader = VmessReader {
             reader: std::io::BufReader::with_capacity(1<<14, conn),
             decoder: AES128CFB::new(md5!(&key), md5!(&IV))
         };
-        reader.handshake();
-        reader
+        reader.handshake().ok()?;
+        Some(reader)
     }
 
     pub fn into_inner(self) -> std::net::TcpStream {
@@ -40,15 +40,16 @@ impl VmessReader<std::io::BufReader<std::net::TcpStream>> {
 }
 
 impl<R: ReadExt> VmessReader<R> {
-    fn handshake(&mut self) {
+    fn handshake(&mut self) -> std::io::Result<()> {
         let mut head = [0; 4];
 
-        self.reader.read_exact(&mut head).unwrap();
+        self.reader.read_exact(&mut head)?;
         self.decoder.decode(&mut head);
 
         assert!(head[0] == 39); // match the number provided at request handshaking
-        let mut cmd = self.reader.read_exact_alloc(head[3] as usize).unwrap();
+        let mut cmd = self.reader.read_exact_alloc(head[3] as usize)?;
         self.decoder.decode(&mut cmd);
+        Ok(())
     }
 }
 

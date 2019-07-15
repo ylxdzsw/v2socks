@@ -8,9 +8,7 @@ use std::io::prelude::*;
 // 2. spawn a child thread for each connection, perform the sock5 and vmess handshake respectively
 // 3. after the handshake succeed, spawn a pair of threads to pipe the two connections forward and backward
 
-// todo:
-// 1. use thread pool or async io
-// 2. less unwraps and better error handling
+// todo: use thread pool or async io
 
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
@@ -71,7 +69,7 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
             let mut stream = stream.try_clone().unwrap();
 
             std::thread::spawn(move || {
-                let mut reader = VmessReader::new(conn, key, IV);
+                let mut reader = VmessReader::new(conn, key, IV).unwrap();
                 let mut buffer = Box::new( unsafe { std::mem::uninitialized::<[u8; 16384]>() } );
                 loop {
                     let len = reader.read(&mut *buffer).unwrap();
