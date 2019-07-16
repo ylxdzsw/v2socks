@@ -10,6 +10,11 @@ use std::io::prelude::*;
 
 // todo: use thread pool or async io
 
+const USAGE: &'static str = "
+Usage: v2socks plain [local_port=1080]
+       v2socks vmess <server_addr>:<server_port> <userid> [local_port=1080]
+";
+
 fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
     let args: Vec<_> = args.iter().map(|x| &x[..]).collect();
@@ -20,15 +25,12 @@ fn main() {
             plain(&server)
         },
         ["vmess", proxy, user_id] | ["vmess", proxy, user_id, _] => {
-            let port: u16 = args.get(4).map(|x| x.parse().unwrap()).unwrap_or(1080);
+            let port: u16 = args.get(3).map(|x| x.parse().unwrap()).unwrap_or(1080);
             let server = Socks5Server::new(port);
             vmess(&server, proxy.into(), parse_uid(user_id).unwrap())
         },
         _ => {
-            eprintln!("
-                Usage: v2socks plain [local_port=1080]
-                       v2socks vmess <server_addr>:<server_port> <userid> [local_port=1080]
-            ")
+            eprint!("{}", USAGE)
         },
     }
 }

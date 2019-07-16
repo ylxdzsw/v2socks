@@ -31,8 +31,8 @@ impl Socks5Server {
     }
 
     pub fn listen<T>(&self, connect: &'static (impl Fn(Addr, u16) -> std::io::Result<(Addr, u16, T)> + Sync), pass: &'static (impl Fn(T, TcpStream) + Sync)) {
-        let socket = TcpListener::bind("0.0.0.0:1080").expect("Address already in use");
-        info!("v2socks starts listening at 0.0.0.0:1080");
+        let socket = TcpListener::bind(format!("0.0.0.0:{}", self.port)).expect("Address already in use");
+        info!("v2socks starts listening at 0.0.0.0:{}", self.port);
 
         for stream in socket.incoming() {
             let stream = stream.unwrap();
