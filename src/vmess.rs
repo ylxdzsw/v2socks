@@ -37,6 +37,10 @@ impl VmessReader<std::io::BufReader<std::net::TcpStream>> {
     pub fn into_inner(self) -> std::net::TcpStream {
         self.reader.into_inner()
     }
+
+    pub fn close(self) {
+        self.into_inner().shutdown(std::net::Shutdown::Read).ignore()
+    }
 }
 
 impl<R: ReadExt> VmessReader<R> {
@@ -95,17 +99,22 @@ pub struct VmessWriter<W: Write> {
 
 impl VmessWriter<std::net::TcpStream> {
     #[allow(non_snake_case)]
-    pub fn new(conn: std::net::TcpStream, user_id: [u8; 16], addr: Addr, port: u16, key: [u8; 16], IV: [u8; 16]) -> Self {
+    pub fn new(conn: std::net::TcpStream, user_id: [u8; 16], addr: Addr, port: u16, key: [u8; 16], IV: [u8; 16]) -> Option<Self> {
         let mut writer = VmessWriter {
             writer: conn,
             encoder: AES128CFB::new(key, IV)
         };
-        writer.handshake(user_id, addr, port, key, IV).unwrap();
-        writer
+        writer.handshake(user_id, addr, port, key, IV).ok()?;
+        Some(writer)
     }
 
     pub fn into_inner(self) -> std::net::TcpStream {
         self.writer
+    }
+
+    pub fn close(mut self) {
+        self.write(&[]).ignore(); // as required by the spec
+        self.into_inner().shutdown(std::net::Shutdown::Write).ignore()
     }
 }
 

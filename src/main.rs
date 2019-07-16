@@ -41,6 +41,13 @@ fn parse_uid(x: &str) -> Option<[u8; 16]> {
     Some(r)
 }
 
+fn is_normal_close(e: &std::io::Error) -> bool {
+    match e.kind() {
+        std::io::ErrorKind::BrokenPipe | std::io::ErrorKind::UnexpectedEof | std::io::ErrorKind::ConnectionReset => true,
+        _ => false
+    }
+}
+
 fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
     let connect = Box::leak(Box::new(move |dest, port| {
         let client = std::net::TcpStream::connect(&proxy).unwrap();
@@ -69,34 +76,52 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
             let mut stream = stream.try_clone().unwrap();
 
             std::thread::spawn(move || {
-                let mut reader = VmessReader::new(conn, key, IV).unwrap();
                 let mut buffer = Box::new( unsafe { std::mem::uninitialized::<[u8; 16384]>() } );
+                let mut reader = match VmessReader::new(conn, key, IV) {
+                    Some(x) => x,
+                    None => return warn!("reader handshake failed")
+                };
                 loop {
-                    let len = reader.read(&mut *buffer).unwrap();
-                    if len == 0 {
-                        reader.into_inner().shutdown(std::net::Shutdown::Read).ignore();
-                        debug!("closed reading");
-                        return 
+                    let len = match reader.read(&mut *buffer) {
+                        Ok(0) => break,
+                        Ok(x) => x,
+                        Err(ref e) if is_normal_close(e) => break,
+                        Err(e) => { error!("{}", e); break }
+                    };
+
+                    match stream.write_all(&buffer[..len]) {
+                        Ok(_) => debug!("read {} bytes", len),
+                        Err(ref e) if is_normal_close(e) => break,
+                        Err(e) => { error!("{}", e); break }
                     }
-                    stream.write_all(&buffer[..len]).unwrap();
-                    debug!("read {} bytes", len);
                 }
+                reader.close();
+                debug!("closed reading")
             });
         }
 
-        let mut writer = VmessWriter::new(conn, user_id, dest, port, key, IV);
         let mut buffer = Box::new( unsafe { std::mem::uninitialized::<[u8; 16384]>() } );
+        let mut writer = match VmessWriter::new(conn, user_id, dest, port, key, IV) {
+            Some(x) => x,
+            None => return warn!("writer handshake failed")
+        };
         loop {
-            let len = stream.read(&mut *buffer).unwrap();
-            if len == 0 {
-                writer.write(&[]).unwrap(); // as required by the spec
-                writer.into_inner().shutdown(std::net::Shutdown::Write).ignore();
-                debug!("closed writing");
-                return
+            let len = match stream.read(&mut *buffer) {
+                Ok(0) => break,
+                Ok(x) => x,
+                Err(ref e) if is_normal_close(e) => break,
+                Err(e) => { error!("{}", e); break }
+            };
+
+            match writer.write_all(&buffer[..len]) {
+                Ok(_) => debug!("sent {} bytes", len),
+                Err(ref e) if is_normal_close(e) => break,
+                Err(e) => { error!("{}", e); break }
             }
-            writer.write_all(&buffer[..len]).unwrap();
-            debug!("sent {} bytes", len);
         }
+
+        writer.close();
+        debug!("closed writing");
     }));
 
     server.listen(connect, pass)
