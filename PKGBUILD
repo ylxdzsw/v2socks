@@ -3,7 +3,7 @@
 pkgname=v2socks
 pkgdesc="An opinioned lightweight socks5 server and vmess (v2ray) client."
 pkgrel=1
-pkgver=0.1.1
+pkgver=0.2.0
 arch=(any)
 url='https://github.com/ylxdzsw/v2socks'
 license=(GPL3)
