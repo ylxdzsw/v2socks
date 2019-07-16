@@ -50,17 +50,17 @@ fn is_normal_close(e: &std::io::Error) -> bool {
 
 fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
     let connect = Box::leak(Box::new(move |dest, port| {
-        let client = std::net::TcpStream::connect(&proxy).unwrap();
+        let client = std::net::TcpStream::connect(&proxy)?;
         debug!("connect {}:{} through proxy", &dest, port);
 
-        let local = client.local_addr().unwrap();
+        let local = client.local_addr()?;
         let local_addr = match local.ip() {
             std::net::IpAddr::V4(x) => Addr::V4(x.octets()),
             std::net::IpAddr::V6(x) => Addr::V6(x.octets()),
         };
         let local_port = local.port();
 
-        (local_addr, local_port, (dest, port, client))
+        Ok((local_addr, local_port, (dest, port, client)))
     }));
 
     #[allow(non_snake_case)]
@@ -72,8 +72,8 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
         thread_rng().fill_bytes(&mut IV);
 
         {
-            let conn = conn.try_clone().unwrap();
-            let mut stream = stream.try_clone().unwrap();
+            let conn = conn.try_clone().expect("failed to clone TCP handle");
+            let mut stream = stream.try_clone().expect("failed to clone TCP handle");
 
             std::thread::spawn(move || {
                 let mut buffer = Box::new( unsafe { std::mem::uninitialized::<[u8; 16384]>() } );
@@ -129,25 +129,25 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
 
 fn plain(server: &Socks5Server) {
     server.listen(&|dest, port| {
-        let client = std::net::TcpStream::connect(format!("{}:{}", dest, port)).unwrap();
+        let client = std::net::TcpStream::connect(format!("{}:{}", dest, port))?;
         debug!("connect {}:{}", dest, port);
 
-        let local = client.local_addr().unwrap();
+        let local = client.local_addr()?;
         let local_addr = match local.ip() {
             std::net::IpAddr::V4(x) => Addr::V4(x.octets()),
             std::net::IpAddr::V6(x) => Addr::V6(x.octets()),
         };
         let local_port = local.port();
 
-        (local_addr, local_port, client)
+        Ok((local_addr, local_port, client))
     }, &|mut proxy, mut stream| {
         {
-            let mut proxy = proxy.try_clone().unwrap();
-            let mut stream = stream.try_clone().unwrap();
+            let mut proxy = proxy.try_clone().expect("failed to clone TCP handle");
+            let mut stream = stream.try_clone().expect("failed to clone TCP handle");
             std::thread::spawn(move || {
-                std::io::copy(&mut proxy, &mut stream)
+                std::io::copy(&mut proxy, &mut stream).ignore()
             });
         }
-        std::io::copy(&mut stream, &mut proxy).unwrap();
+        std::io::copy(&mut stream, &mut proxy).ignore();
     })
 }
