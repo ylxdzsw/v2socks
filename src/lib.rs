@@ -1,10 +1,13 @@
+#![allow(irrefutable_let_patterns)]
 #![allow(dead_code, unused_imports)]
-#![deny(bare_trait_objects)]
 #![allow(non_camel_case_types)]
+#![deny(bare_trait_objects)]
+#![warn(clippy::all)]
 
 mod socks;
 mod vmess;
 
+use oh_my_rust::*;
 pub use socks::*;
 pub use vmess::*;
 
@@ -18,9 +21,9 @@ pub enum Addr {
 impl std::fmt::Display for Addr {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Addr::V4(x) => std::fmt::Display::fmt(&std::net::Ipv4Addr::from(x.clone()), fmt),
-            Addr::V6(x) => std::fmt::Display::fmt(&std::net::Ipv6Addr::from(x.clone()), fmt),
-            Addr::Domain(x) => std::fmt::Display::fmt(&String::from_utf8(x.to_vec()).unwrap(), fmt) // somewhat ugly, need more time to fight the type checker
+            Addr::V4(x) => std::fmt::Display::fmt(&std::net::Ipv4Addr::from(*x), fmt),
+            Addr::V6(x) => std::fmt::Display::fmt(&std::net::Ipv6Addr::from(*x), fmt),
+            Addr::Domain(x) => std::fmt::Display::fmt(std::str::from_utf8(x).msg(std::fmt::Error)?, fmt)
         }
     }
 }

@@ -15,7 +15,7 @@ macro_rules! close_on_error {
         match $ex {
             Ok(x) => x,
             Err(e) => {
-                return error!("{}", e)
+                return warn!("{}", e)
             }
         }
     }}
@@ -30,7 +30,7 @@ impl Socks5Server {
         Socks5Server { port }
     }
 
-    pub fn listen<T>(&self, connect: &'static (impl Fn(Addr, u16) -> std::io::Result<(Addr, u16, T)> + Sync), pass: &'static (impl Fn(T, TcpStream) + Sync)) {
+    pub fn listen<T>(&self, connect: &'static (impl Fn(Addr, u16) -> std::io::Result<(Addr, u16, T)> + Sync), pass: &'static (impl Fn(T, TcpStream) + Sync)) -> ! {
         let socket = TcpListener::bind(format!("0.0.0.0:{}", self.port)).expect("Address already in use");
         info!("v2socks starts listening at 0.0.0.0:{}", self.port);
 
@@ -44,32 +44,31 @@ impl Socks5Server {
                 pass(proxy, stream);
             });
         }
+
+        unreachable!()
     }
 }
 
 fn initialize(stream: &mut (impl ReadExt + Write)) -> Result<(), String> {
-    let mut header = [0, 0];
-    stream.read_exact(&mut header).map_err(|_| "read initial bits failed")?;
-    
+    let header = read_exact!(stream, [0, 0]).msg("read initial bits failed")?;
+
     if header[0] != 5 {
         return Err(format!("unsupported socks version {}", header[0]))
     }
 
-    let list: Vec<u8> = stream.read_exact_alloc(header[1] as usize).map_err(|_| "read methods failed")?;
+    let list: Vec<u8> = stream.read_exact_alloc(header[1] as usize).msg("read methods failed")?;
 
     if !list.contains(&0) {
-        stream.write(&[5, 0xff]).map_err(|_| "write response failed")?;
-        return Err("client do not support NO AUTH method".to_owned())
+        stream.write(&[5, 0xff]).msg("write response failed")?;
+        return Err("client do not support NO AUTH method".to_string())
     }
 
-    stream.write(&[5, 0]).map_err(|_| "write response failed")?;
+    stream.write(&[5, 0]).msg("write response failed")?;
     Ok(())
 }
 
 fn read_request(stream: &mut (impl ReadExt + Write)) -> Result<(Addr, u16), String> {
-    let mut header = [0; 4];
-    stream.read_exact(&mut header).map_err(|_| "read request header failed")?;
-    let [ver, cmd, _rev, atyp] = header;
+    let [ver, cmd, _rev, atyp] = read_exact!(stream, [0; 4]).msg("read request header failed")?;
 
     if ver != 5 {
         return Err(format!("unsupported socks version {}", ver))
@@ -80,27 +79,24 @@ fn read_request(stream: &mut (impl ReadExt + Write)) -> Result<(Addr, u16), Stri
     }
 
     let addr = match atyp {
-        0x01 => Addr::V4(read_exact!(stream, [0; 4]).map_err(|_| "read v4 address failed")?),
-        0x04 => Addr::V6(read_exact!(stream, [0; 16]).map_err(|_| "read v6 address failed")?),
+        0x01 => Addr::V4(read_exact!(stream, [0; 4]).msg("read v4 address failed")?),
+        0x04 => Addr::V6(read_exact!(stream, [0; 16]).msg("read v6 address failed")?),
         0x03 => {
-            let mut len = [0];
-            stream.read_exact(&mut len).map_err(|_| "read domain length failed")?;
-            let len = len[0];
-
-            Addr::Domain(stream.read_exact_alloc(len as usize).map_err(|_| "read domain failed")?.into_boxed_slice())
+            let len = read_exact!(stream, [0]).msg("read domain length failed")?[0];
+            Addr::Domain(stream.read_exact_alloc(len as usize).msg("read domain failed")?.into_boxed_slice())
         },
-        _ => return Err("unknown ATYP".to_owned())
+        _ => return Err("unknown ATYP".to_string())
     };
 
-    let mut port: [u8; 2] = [0; 2];
-    stream.read_exact(&mut port).map_err(|_| "read port failed")?;
-    let port: u16 = (port[0] as u16) << 8 | port[1] as u16;
+    let port = read_exact!(stream, [0; 2]).msg("read port failed")?;
+    let port = (port[0] as u16) << 8 | port[1] as u16;
 
     Ok((addr, port))
 }
 
 fn reply_request(stream: &mut (impl ReadExt + Write), addr: Addr, port: u16) -> Result<(), String> {
-    let mut reply = vec![5, 0, 0];
+    let mut reply = Vec::with_capacity(22); // cover V4 and V6
+    reply.extend_from_slice(&[5, 0, 0]);
 
     match addr {
         Addr::V4(x) => {
@@ -121,7 +117,7 @@ fn reply_request(stream: &mut (impl ReadExt + Write), addr: Addr, port: u16) -> 
     reply.push((port >> 8) as u8);
     reply.push(port as u8);
 
-    stream.write(&reply).map_err(|_| "write reply failed")?;
+    stream.write(&reply).msg("write reply failed")?;
 
     Ok(())
 }

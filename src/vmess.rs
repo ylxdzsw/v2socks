@@ -83,7 +83,7 @@ impl<R: ReadExt> Read for VmessReader<R> {
         // 4. verify checksum
         let checksum = fnv1a(&buf[..len-4]);
         if checksum.to_be_bytes() != temp {
-            panic!("fuck")
+            return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "invalid checksum!"))
         }
 
         Ok(len-4)
@@ -182,8 +182,7 @@ impl<W: Write> VmessWriter<W> {
 
         AES128CFB::new(header_key, header_IV).encode(&mut buffer);
 
-        self.writer.write_all(&buffer)?;
-        Ok(())
+        self.writer.write_all(&buffer)
     }
 }
 
@@ -195,7 +194,7 @@ impl<W: Write> Write for VmessWriter<W> {
         buf.extend_from_slice(&fnv1a(data).to_be_bytes());
         buf.extend_from_slice(data);
         self.encoder.encode(&mut buf); // this is the right code. the fucking protocol document is misleading!
-        self.writer.write_all(&mut buf)?;
+        self.writer.write_all(&buf)?;
         Ok(data.len())
     }
 
@@ -204,6 +203,7 @@ impl<W: Write> Write for VmessWriter<W> {
     }
 }
 
+#[allow(clippy::unreadable_literal)]
 fn fnv1a(x: &[u8]) -> u32 {
     let prime = 16777619;
     let mut hash = 0x811c9dc5;
@@ -230,8 +230,7 @@ impl AES128CFB {
     fn encode(&mut self, data: &mut [u8]) {
         for byte in data.iter_mut() {
             if self.p == 16 {
-                let temp = self.state.clone();
-                crypto::aessafe::AesSafe128Encryptor::new(&self.key).encrypt_block(&temp, &mut self.state);
+                crypto::aessafe::AesSafe128Encryptor::new(&self.key).encrypt_block(&self.state.clone(), &mut self.state);
                 self.p = 0;
             }
             *byte ^= self.state[self.p];
@@ -243,8 +242,7 @@ impl AES128CFB {
     fn decode(&mut self, data: &mut [u8]) {
         for byte in data.iter_mut() {
             if self.p == 16 {
-                let temp = self.state.clone();
-                crypto::aessafe::AesSafe128Encryptor::new(&self.key).encrypt_block(&temp, &mut self.state); // yes it's encrypt
+                crypto::aessafe::AesSafe128Encryptor::new(&self.key).encrypt_block(&self.state.clone(), &mut self.state); // yes it's encrypt
                 self.p = 0;
             }
             let temp = *byte;

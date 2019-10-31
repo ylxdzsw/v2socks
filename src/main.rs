@@ -29,18 +29,14 @@ fn main() {
             let server = Socks5Server::new(port);
             vmess(&server, proxy.into(), parse_uid(user_id).unwrap())
         },
-        _ => {
-            eprint!("{}", USAGE)
-        },
+        _ => eprint!("{}", USAGE)
     }
 }
 
 fn parse_uid(x: &str) -> Option<[u8; 16]> {
-    let mut r = [0; 16];
     let x = x.replace('-', "");
     let list: Vec<_> = (0..32).step_by(2).map(|i| u8::from_str_radix(&x[i..i+2], 16).unwrap()).collect();
-    r.clone_from_slice(list.get(0..16)?);
-    Some(r)
+    list.get(0..16).map(|x| [0; 16].apply(|buf| buf.copy_from_slice(x)))
 }
 
 fn is_normal_close(e: &std::io::Error) -> bool {
@@ -51,7 +47,7 @@ fn is_normal_close(e: &std::io::Error) -> bool {
 }
 
 fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
-    let connect = Box::leak(Box::new(move |dest, port| {
+    let connect = leak(move |dest, port| {
         let client = std::net::TcpStream::connect(&proxy)?;
         debug!("connect {}:{} through proxy", &dest, port);
 
@@ -63,22 +59,19 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
         let local_port = local.port();
 
         Ok((local_addr, local_port, (dest, port, client)))
-    }));
+    });
 
     #[allow(non_snake_case)]
-    let pass = Box::leak(Box::new(move |(dest, port, conn): (Addr, u16, std::net::TcpStream), mut stream: std::net::TcpStream| {
-        let mut key = [0; 16];
-        thread_rng().fill_bytes(&mut key);
-
-        let mut IV = [0; 16];
-        thread_rng().fill_bytes(&mut IV);
+    let pass = leak(move |(dest, port, conn): (Addr, u16, std::net::TcpStream), mut stream: std::net::TcpStream| {
+        let key = [0; 16].apply(|x| thread_rng().fill_bytes(x));
+        let IV = [0; 16].apply(|x| thread_rng().fill_bytes(x));
 
         {
             let conn = conn.try_clone().expect("failed to clone TCP handle");
             let mut stream = stream.try_clone().expect("failed to clone TCP handle");
 
             std::thread::spawn(move || {
-                let mut buffer = Box::new( unsafe { std::mem::uninitialized::<[u8; 16384]>() } );
+                let mut buffer = Box::new([0; 16384]);
                 let mut reader = match VmessReader::new(conn, key, IV) {
                     Some(x) => x,
                     None => return warn!("reader handshake failed")
@@ -88,13 +81,13 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
                         Ok(0) => break,
                         Ok(x) => x,
                         Err(ref e) if is_normal_close(e) => break,
-                        Err(e) => { error!("{}", e); break }
+                        Err(e) => { warn!("{}", e); break }
                     };
 
                     match stream.write_all(&buffer[..len]) {
                         Ok(_) => debug!("read {} bytes", len),
                         Err(ref e) if is_normal_close(e) => break,
-                        Err(e) => { error!("{}", e); break }
+                        Err(e) => { warn!("{}", e); break }
                     }
                 }
                 reader.close();
@@ -102,7 +95,7 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
             });
         }
 
-        let mut buffer = Box::new( unsafe { std::mem::uninitialized::<[u8; 16384]>() } );
+        let mut buffer = Box::new([0; 16384]);
         let mut writer = match VmessWriter::new(conn, user_id, dest, port, key, IV) {
             Some(x) => x,
             None => return warn!("writer handshake failed")
@@ -112,19 +105,19 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
                 Ok(0) => break,
                 Ok(x) => x,
                 Err(ref e) if is_normal_close(e) => break,
-                Err(e) => { error!("{}", e); break }
+                Err(e) => { warn!("{}", e); break }
             };
 
             match writer.write_all(&buffer[..len]) {
                 Ok(_) => debug!("sent {} bytes", len),
                 Err(ref e) if is_normal_close(e) => break,
-                Err(e) => { error!("{}", e); break }
+                Err(e) => { warn!("{}", e); break }
             }
         }
 
         writer.close();
         debug!("closed writing");
-    }));
+    });
 
     server.listen(connect, pass)
 }
