@@ -53,7 +53,8 @@ fn initialize(stream: &mut (impl ReadExt + Write)) -> Result<(), String> {
     let header = read_exact!(stream, [0, 0]).msg("read initial bits failed")?;
 
     if header[0] != 5 {
-        return Err(format!("unsupported socks version {}", header[0]))
+        let hint = "if the version is 71, the software probabily used it as an HTTP proxy";
+        return Err(format!("unsupported socks version {}. Hint: {}", header[0], hint))
     }
 
     let list: Vec<u8> = stream.read_exact_alloc(header[1] as usize).msg("read methods failed")?;
