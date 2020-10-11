@@ -1,0 +1,51 @@
+name: CI & Build
+on: [push, pull_request]
+
+jobs:
+  test:
+    name: Test
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: x86_64-linux-gnu, os: ubuntu-latest, target: x86_64-unknown-linux-gnu }
+          - { name: x86_64-linux-musl, os: ubuntu-latest, target: x86_64-unknown-linux-musl }
+          - { name: x86_64-darwin, os: macos-latest, target: x86_64-apple-darwin }
+          - { name: x86_64-windows-msvc, os: windows-latest, target: x86_64-pc-windows-msvc }
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: ${{ matrix.target }}
+      # - run: cargo test --target ${{ matrix.target }}
+      - run: cargo build --release --target ${{ matrix.target }}
+      - run: strip target/${{ matrix.target }}/release/v2socks
+        if: matrix.name != 'x86_64-windows-msvc'
+      - run: mv target/${{ matrix.target }}/release/v2socks.exe target/${{ matrix.target }}/release/v2socks
+        if: matrix.name == 'x86_64-windows-msvc'
+      - uses: actions/upload-artifact@v2
+        with:
+          name: v2socks-${{ matrix.name }}
+          path: target/${{ matrix.target }}/release/v2socks
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test]
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/download-artifact@v2
+      - run: |
+          mkdir artifacts
+          mv v2socks-x86_64-linux-gnu/v2socks artifacts/v2socks-x86_64-linux-gnu
+          mv v2socks-x86_64-linux-musl/v2socks artifacts/v2socks-x86_64-linux-musl
+          mv v2socks-x86_64-darwin/v2socks artifacts/v2socks-x86_64-darwin
+          mv v2socks-x86_64-windows-msvc/v2socks artifacts/v2socks-x86_64-windows-msvc
+      - uses: softprops/action-gh-release@v1
+        with:
+          draft: true
+          files: artifacts/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
