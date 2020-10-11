@@ -19,6 +19,8 @@ jobs:
         with:
           toolchain: stable
           target: ${{ matrix.target }}
+      - run: sudo apt-get install musl-tools
+        if: matrix.name == 'x86_64-linux-musl'
       # - run: cargo test --target ${{ matrix.target }}
       - run: cargo build --release --target ${{ matrix.target }}
       - run: strip target/${{ matrix.target }}/release/v2socks
