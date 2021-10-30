@@ -10,7 +10,7 @@ use std::io::prelude::*;
 
 // todo: use thread pool or async io
 
-const USAGE: &'static str = "
+const USAGE: &str = "
 Usage: v2socks plain [local_port=1080]
        v2socks vmess <server_addr>:<server_port> <userid> [local_port=1080]
 ";
@@ -40,14 +40,11 @@ fn parse_uid(x: &str) -> Option<[u8; 16]> {
 }
 
 fn is_normal_close(e: &std::io::Error) -> bool {
-    match e.kind() {
-        std::io::ErrorKind::BrokenPipe | std::io::ErrorKind::UnexpectedEof | std::io::ErrorKind::ConnectionReset => true,
-        _ => false
-    }
+    matches!(e.kind(), std::io::ErrorKind::BrokenPipe | std::io::ErrorKind::UnexpectedEof | std::io::ErrorKind::ConnectionReset)
 }
 
 fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
-    let connect = leak(move |dest, port| {
+    let connect = move |dest, port| {
         let client = std::net::TcpStream::connect(&proxy)?;
         debug!("connect {}:{} through proxy", &dest, port);
 
@@ -59,10 +56,10 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
         let local_port = local.port();
 
         Ok((local_addr, local_port, (dest, port, client)))
-    });
+    };
 
     #[allow(non_snake_case)]
-    let pass = leak(move |(dest, port, conn): (Addr, u16, std::net::TcpStream), mut stream: std::net::TcpStream| {
+    let pass = move |(dest, port, conn): (Addr, u16, std::net::TcpStream), mut stream: std::net::TcpStream| {
         let key = [0; 16].apply(|x| thread_rng().fill_bytes(x));
         let IV = [0; 16].apply(|x| thread_rng().fill_bytes(x));
 
@@ -117,9 +114,9 @@ fn vmess(server: &Socks5Server, proxy: String, user_id: [u8; 16]) {
 
         writer.close();
         debug!("closed writing");
-    });
+    };
 
-    server.listen(connect, pass)
+    server.listen(connect.box_and_leak(), pass.box_and_leak())
 }
 
 fn plain(server: &Socks5Server) {

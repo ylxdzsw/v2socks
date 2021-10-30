@@ -1,13 +1,6 @@
-#![allow(irrefutable_let_patterns)]
-#![allow(dead_code, unused_imports)]
-#![allow(non_camel_case_types)]
-#![deny(bare_trait_objects)]
-#![warn(clippy::all)]
-
 mod socks;
 mod vmess;
 
-use oh_my_rust::*;
 pub use socks::*;
 pub use vmess::*;
 
@@ -23,7 +16,7 @@ impl std::fmt::Display for Addr {
         match self {
             Addr::V4(x) => std::fmt::Display::fmt(&std::net::Ipv4Addr::from(*x), fmt),
             Addr::V6(x) => std::fmt::Display::fmt(&std::net::Ipv6Addr::from(*x), fmt),
-            Addr::Domain(x) => std::fmt::Display::fmt(std::str::from_utf8(x).msg(std::fmt::Error)?, fmt)
+            Addr::Domain(x) => std::fmt::Display::fmt(std::str::from_utf8(x).map_err(|_| std::fmt::Error)?, fmt)
         }
     }
 }
