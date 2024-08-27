@@ -1,15 +1,15 @@
 [package]
 name = "v2socks"
-version = "0.2.3"
+version = "0.2.4"
 authors = ["ylxdzsw <ylxdzsw@gmail.com>"]
-edition = "2018"
+edition = "2021"
 
 [profile.release]
 panic = "abort"
 lto = true
 
 [dependencies]
-oh-my-rust = { git = "https://github.com/ylxdzsw/oh-my-rust", default-features = false, features = ["std"]}
+absurd = { git = "https://github.com/ylxdzsw/absurd" }
 rust-crypto = "0.2"
 rand = "0.8"
 anyhow = "1.0"

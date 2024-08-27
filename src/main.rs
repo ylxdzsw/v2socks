@@ -1,13 +1,11 @@
 use v2socks::*;
-use oh_my_rust::*;
+use absurd::*;
 use rand::prelude::*;
 use std::io::prelude::*;
 
-// basic logic:
 // 1. main thread listen for socks5 connections
 // 2. spawn a child thread for each connection, perform the sock5 and vmess handshake respectively
 // 3. after the handshake succeed, spawn a pair of threads to pipe the two connections forward and backward
-
 // todo: use thread pool or async io
 
 const USAGE: &str = "

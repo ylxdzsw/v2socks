@@ -1,5 +1,5 @@
 use super::*;
-use oh_my_rust::*;
+use absurd::*;
 use anyhow::{Context, Result, anyhow};
 use std::net::{TcpListener, TcpStream};
 use std::io::prelude::*;
@@ -58,7 +58,7 @@ fn initialize(stream: &mut (impl ReadExt + Write)) -> Result<()> {
         return Err(anyhow!("unsupported socks version {}. Hint: {}", header[0], hint))
     }
 
-    let list: Vec<u8> = stream.read_exact_alloc(header[1] as usize).context("read methods failed")?;
+    let list = stream.read_exact_alloc(header[1] as usize).context("read methods failed")?;
 
     if !list.contains(&0) {
         stream.write(&[5, 0xff]).context("write response failed")?;
@@ -85,7 +85,7 @@ fn read_request(stream: &mut (impl ReadExt + Write)) -> Result<(Addr, u16)> {
         0x04 => Addr::V6(read_exact!(stream, [0; 16]).context("read v6 address failed")?),
         0x03 => {
             let len = read_exact!(stream, [0]).context("read domain length failed")?[0];
-            Addr::Domain(stream.read_exact_alloc(len as usize).context("read domain failed")?.into_boxed_slice())
+            Addr::Domain(stream.read_exact_alloc(len as usize).context("read domain failed")?)
         },
         _ => return Err(anyhow!("unknown ATYP"))
     };
@@ -123,4 +123,3 @@ fn reply_request(stream: &mut (impl ReadExt + Write), addr: Addr, port: u16) -> 
 
     Ok(())
 }
-

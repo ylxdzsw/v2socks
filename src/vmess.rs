@@ -1,5 +1,5 @@
 use super::*;
-use oh_my_rust::*;
+use absurd::*;
 use crypto::digest::Digest;
 use crypto::symmetriccipher::BlockEncryptor;
 use crypto::mac::Mac;
